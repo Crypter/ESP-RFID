@@ -28,7 +28,7 @@ static String webResponse;
 // Variables used for state keeping
 static uint8_t delayed_setup = 1;
 static uint8_t state=1;
-static uint8_t active_id=1;
+static uint8_t active_id=0;
 
 uint8_t  vendor_active=0;
 uint32_t ID_active=0;
