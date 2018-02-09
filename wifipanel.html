@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Control Room</title>
+<script>
+function httpGetAsync(theUrl, callback)
+{
+  var xmlHttp = new XMLHttpRequest();
+  xmlHttp.onreadystatechange = function() {
+    if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+      if (callback) callback(xmlHttp.responseText);
+  }
+  xmlHttp.open("GET", theUrl, true);
+  xmlHttp.send(null);
+}
+
+window.onload = function(){
+// window.setInterval(main, 1000);
+  httpGetAsync("/api", setup);
+}
+
+function reload(){
+  location.reload();
+}
+
+function setup(data){
+  data = JSON.parse(data);
+  var options = document.getElementById("wifis");
+  for (var i=0; i<data["wifi"].length; i++){
+    var newOption = document.createElement("option");
+    newOption.text = data["wifi"][i]["ssid"]+" ("+data["wifi"][i]["pass"].length+")";
+    newOption.value = data["wifi"][i]["id"];
+    options.options.add(newOption, newOption.value);
+  }
+}
+
+function remove(){
+  var selection = document.getElementById("wifis");
+  console.log(selection.options[selection.options.selectedIndex].value);
+  httpGetAsync("/api?remove=wifi&id="+selection.options[selection.options.selectedIndex].value);
+  selection.options.remove(selection.options.selectedIndex);
+  return false;
+}
+
+function add(){
+  console.log("/api?add=wifi&ssid="+document.getElementById("ssid").value+"&pass="+document.getElementById("pass").value);
+  httpGetAsync("/api?add=wifi&ssid="+document.getElementById("ssid").value+"&pass="+document.getElementById("pass").value, reload);
+  return false;
+}
+
+</script>
+<style>
+button, select , input{
+  display: block;
+  margin: 1px;
+}
+button, input {
+  min-width: 200px;
+}
+body {
+  background-color: #EEEEEE;
+}
+</style>
+</head>
+<body>
+  <form action="/api" method="get" onsubmit="return remove()">
+    <select id="wifis">
+    </select>
+    <input type="submit" value="Delete">
+  </form>
+  <form action="/api" method="get" onsubmit="return add()">
+    <span>SSID: </span><input id="ssid" type="text">
+    <span>PASS: </span><input id="pass" type="password">
+    <input type="submit" value="Add">
+  </form>
+  <button id="wifi" onclick="javascript:location.href='/'" >Home</button>
+  <button id="rfid" onclick="javascript:location.href='/rfid'" >RFID Setup</button>
+</body>
+</html>

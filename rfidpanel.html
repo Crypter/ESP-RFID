@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Control Room</title>
+<script>
+function httpGetAsync(theUrl, callback)
+{
+  var xmlHttp = new XMLHttpRequest();
+  xmlHttp.onreadystatechange = function() {
+    if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+      if (callback) callback(xmlHttp.responseText);
+  }
+  xmlHttp.open("GET", theUrl, true);
+  xmlHttp.send(null);
+}
+
+window.onload = function(){
+// window.setInterval(main, 1000);
+  httpGetAsync("/api", setup);
+}
+
+function reload(){
+  location.reload();
+}
+
+function setup(data){
+  data = JSON.parse(data);
+  var options = document.getElementById("rfids");
+  for (var i=0; i<data["rfid"].length; i++){
+    var newOption = document.createElement("option");
+    newOption.text = data["rfid"][i]["name"]+"("+data["rfid"][i]["vendor"]+"|"+data["rfid"][i]["uid"]+")";
+    newOption.value = data["rfid"][i]["id"];
+    options.options.add(newOption, newOption.value);
+  }
+}
+
+function remove(){
+  var selection = document.getElementById("rfids");
+  console.log(selection.options[selection.options.selectedIndex].value);
+  httpGetAsync("/api?remove=rfid&id="+selection.options[selection.options.selectedIndex].value);
+  selection.options.remove(selection.options.selectedIndex);
+  return false;
+}
+
+function add(){
+  console.log("/api?add=rfid&uid="+document.getElementById("uid").value+"&vendor="+document.getElementById("vendor").value+"&name="+document.getElementById("name").value);
+  httpGetAsync("/api?add=rfid&uid="+document.getElementById("uid").value+"&vendor="+document.getElementById("vendor").value+"&name="+document.getElementById("name").value, reload);
+  return false;
+}
+
+</script>
+<style>
+button, select , input{
+  display: block;
+  margin: 1px;
+}
+button, input {
+  min-width: 200px;
+}
+body {
+  background-color: #EEEEEE;
+}
+</style>
+</head>
+<body>
+  <form action="/api" method="get" onsubmit="return remove()">
+    <select id="rfids">
+    </select>
+    <input type="submit" value="Delete">
+  </form>
+  <form action="/api" method="get" onsubmit="return add()">
+    <span>Vendor (can be 0): </span><input id="vendor" type="text">
+    <span>ID: </span><input id="uid" type="text">
+    <span>Name: </span><input id="name" type="text">
+    <input type="submit" value="Add">
+  </form>
+  <button id="home" onclick="javascript:location.href='/'" >Home</button>
+  <button id="wifi" onclick="javascript:location.href='/wifi'" >WiFi Setup</button>
+</body>
+</html>
