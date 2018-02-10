@@ -18,8 +18,8 @@ TCP is very error resilient protocol, and so is RFID. This allows us to abuse th
 #### What's the big dial?
 -It wasn't possible to do this on the fly-untill now! This was previously done with Attiny85, but it took programming harware and the ID could not be changed unless you reprogram the chip using dedicated programmer. What makes this bigger deal is the fact that the ID of the skimmed cards is printed on them most of the time, you don't even need a reader.
 
-#### But there's Vendor ID that it's not imprinted on the cards!  
--Unfortunately, it doesn't matter because 90% of the readers ignore that part to achieve compatibility with the [Wiegand interface](https://en.wikipedia.org/wiki/Wiegand_interface). To make them easier to implement they use only the ID data. You can replace this vendor ID with zeros most of the time.
+#### But there's Vendor ID that's not printed on the cards!  
+-Unfortunately, it doesn't matter. 90% of the readers ignore that part to achieve compatibility with the [Wiegand interface](https://en.wikipedia.org/wiki/Wiegand_interface). To make them easier to implement they use only the ID data. You can replace this vendor ID with zeros most of the time.
 
 #### Can I have one?
 -**No.** I'm doing this as a proof of concept. I'm not selling this. I'm not going to build one for you. I did this as an exercise for my penetration testing skils. It's public because I want to share my knowledge.
