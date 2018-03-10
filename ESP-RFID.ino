@@ -11,9 +11,13 @@
 
 ADC_MODE(ADC_VCC);
 
-static char DEBUGMODE=0;
+#define RF_PIN D1
+#define ACTIVITY_LED D4
 
+static char DEBUGMODE=0;
 //helpers for debugging timings
+int32_t starttime, stoptime;
+
 static inline int32_t asm_ccount(void) {
     int32_t r; asm volatile ("rsr %0, ccount" : "=r"(r)); return r; }
 
@@ -29,6 +33,7 @@ static String webResponse;
 static uint8_t delayed_setup = 1;
 static uint8_t state=1;
 static uint8_t active_id=0;
+static uint8_t network_count=0;
 
 uint8_t  vendor_active=0;
 uint32_t ID_active=0;
@@ -40,7 +45,7 @@ void prepare_data(uint32_t ID, uint32_t VENDOR){
   for (int i=1; i<8; i++){
     value[i+2] = (ID>>(28-i*4)) &0xF;
   }
-  
+
   for (int i=0; i<9; i++) data[i]=1; //header
   for (int i=0; i<10; i++) {         //data
     for (int j=0; j<4; j++) {
@@ -59,7 +64,7 @@ void prepare_data(uint32_t ID, uint32_t VENDOR){
     data[i+59] = checksum%2;
   }
   data[63] = 0;                      //footer
-  
+
   /*
   delay(10);
   Serial.println();
@@ -131,10 +136,10 @@ void handleApi() {
       configFile = SPIFFS.open("/rfid.conf", "w");
       config.printTo(configFile);
     }
-    
-    
+
+
   }
-  
+
   if (server.hasArg("add"))
   {
     if (server.arg("add")=="wifi"){
@@ -213,7 +218,7 @@ void handleApi() {
       }
     }
   }
-  
+
   webResponse = "";
   config["battery"] = ESP.getVcc()/901.515;
   config.prettyPrintTo(webResponse);
@@ -244,7 +249,7 @@ void handleFormat() {
 void setup() {
   EEPROM.begin(1);
   state = EEPROM.read(0) & 1;
-  
+
   if (ESP.getResetReason() == "Deep-Sleep Wake" | ESP.getResetReason() == "External System") {
     state = !state;
     EEPROM.write(0, state);
@@ -255,23 +260,23 @@ void setup() {
     ESP.deepSleep(0);
   }
   EEPROM.end();
-  
-  
-  pinMode(2, INPUT);
-  pinMode(0, OUTPUT);
-  pinMode(1, OUTPUT);
-  digitalWrite(0, LOW);
-  digitalWrite (1, LOW);
+
+
+  pinMode(RF_PIN, INPUT);
+  pinMode(ACTIVITY_LED, OUTPUT);
+//  pinMode(1, OUTPUT);
+  digitalWrite(ACTIVITY_LED, LOW);
+//  digitalWrite (1, LOW);
 
   WiFi.disconnect(true); //true = WiFi.mode(WIFI_OFF);
-  delay(100);
-  
+  delay(50);
+
   if (DEBUGMODE) Serial.begin(115200);
 
 
-  WiFi.persistent(false); //Do NOT write to flash;
+//  WiFi.persistent(false); //Do NOT write to flash;
   WiFi.mode(WIFI_STA);
-  
+
   SPIFFS.begin();
   if (SPIFFS.exists("/rfid.conf")){
     File configFile = SPIFFS.open("/rfid.conf", "r");
@@ -281,6 +286,7 @@ void setup() {
     DEBUGMODE = config["debug"];
     active_id = config["active_id"];
 
+    network_count=config["wifi"].size();
     for (int i=0; i<config["wifi"].size(); i++) {
       WiFiMulti.addAP(config["wifi"][i]["ssid"], config["wifi"][i]["pass"]);
     }
@@ -291,8 +297,8 @@ void setup() {
         ID_active = config["rfid"][i]["uid"];
       }
     }
-    
-    
+
+
   }
   else {
     File configFile = SPIFFS.open("/rfid.conf", "w");
@@ -312,7 +318,7 @@ void setup() {
   server.on("/rfid", handleRfid);
   server.on("/reboot", handleReboot);
   server.on("/format", handleFormat);
-    
+
   ArduinoOTA.onStart([]() {
     String type;
     if (ArduinoOTA.getCommand() == U_FLASH)
@@ -359,7 +365,7 @@ void loop() {
         delayed_setup=0;
         if (DEBUGMODE) Serial.printf("WiFi connected, IP: %s\r\n", WiFi.localIP().toString().c_str());
       }
-      else if (millis()>15000){
+      else if (millis()>15000 || !network_count){
         if (DEBUGMODE) Serial.println("WiFi failed, Hotspot up...");
         WiFi.scanDelete();
         WiFi.disconnect();
@@ -374,46 +380,30 @@ void loop() {
     ArduinoOTA.handle();
     server.handleClient();
   }
-  delay(2);
-  
-  digitalWrite (1, LOW);
-  
+
+  digitalWrite (ACTIVITY_LED, LOW);
+
+  delay(10);
   int i=0, j=0;
   //Manchester
   if (active_id){
-    for (i=0; i<5; i++){
+    for (i=0; i<15; i++){
       for (j=0; j<64; j++){
-        data[j]? pinMode(2, OUTPUT):pinMode(2, INPUT);
-//        data[j]? (GPE |= 0b00000100):(GPE &= ~0b00100100);
-        delayMicroseconds(256);
-  
-        data[j]? pinMode(2, INPUT):pinMode(2, OUTPUT);
+
+//        data[j]? pinMode(RF_PIN, OUTPUT):pinMode(RF_PIN, INPUT);
+//        data[j]? (GPE |= 0b00000100):(GPE &= ~0b00000100);
+        data[j]? (GPE |= (1<<RF_PIN)):(GPE &= ~(1<<RF_PIN));
+        delayMicroseconds(255);
+        for (int k=0; k<14; k++) asm_nop(); //fine tuning
+
+//        data[j]? pinMode(RF_PIN, INPUT):pinMode(RF_PIN, OUTPUT);
 //        data[j]? (GPE &= ~0b00000100):(GPE |= 0b00000100);
-        delayMicroseconds(256);
+        data[j]? (GPE &= ~(1<<RF_PIN)):(GPE |= (1<<RF_PIN));
+        delayMicroseconds(255);
+        for (int k=0; k<13; k++) asm_nop(); //fine tuning
+
       }
     }
-    digitalWrite (1, HIGH);
+    digitalWrite (ACTIVITY_LED, HIGH);
   }
-
-  
-
-  
-
-/*
-  //PSK - never tested
-  for (;;){
-    for (j=0; j<64; j++) {
-      pinMode(D1, OUTPUT);
-//      data[j]? (GPE |= 0b00100000):(GPE &= ~0b00100000);
-      delayMicroseconds(250);
-
-      pinMode(D1, INPUT);
-      data[j] ? delayMicroseconds(250):delayMicroseconds(128);
-//      data[j]? (GPE &= ~0b00100000):(GPE |= 0b00100000);
-    }
-        delay(0);
-
-  }
-*/
-  
 }
